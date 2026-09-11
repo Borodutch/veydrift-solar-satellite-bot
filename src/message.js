@@ -8,16 +8,7 @@ export function totalBuiltAndQueued(built, activeQueue, backlog, ship) {
   BigInt(built)).toString();
 }
 
-export function formatAnnouncement({ planetId, name, player, galaxy, system, position, total, queued }) {
-  const coordinates = galaxy && system && position ? ` [${galaxy}:${system}:${position}]` : "";
-  const planet = name?.trim() || `Planet #${planetId}`;
-
-  return [
-    "🛰 Solar satellites queued",
-    "",
-    `Player: ${player}`,
-    `Planet: ${planet}${coordinates} (#${planetId})`,
-    `Already built + already queued: ${total}`,
-    `Added to queue: +${queued}`
-  ].join("\n");
+export function formatAnnouncement({ player, total, queued }) {
+  const satellite = queued === "1" ? "satellite" : "satellites";
+  return `🛰 ${player} is building ${queued} more solar ${satellite} (already built/queued: ${total})`;
 }

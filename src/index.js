@@ -9,7 +9,6 @@ const DEFAULT_CONTRACT = "0xf397910F005151b09644228573a4353818D3755d";
 const SOLAR_SATELLITE = 9;
 const ABI = parseAbi([
   "event ShipQueued(uint256 indexed planetId, uint8 indexed ship, uint32 quantity, uint64 readyAt, uint128 metal, uint128 crystal, uint128 deuterium)",
-  "function planetNames(uint256 planetId) view returns (string)",
   "function shipCount(uint256 planetId, uint8 ship) view returns (uint32)",
   "function shipQueue(uint256 planetId) view returns ((bool active, uint8 ship, uint32 quantity, uint64 readyAt, (uint128 metal, uint128 crystal, uint128 deuterium) cost))",
   "function shipQueueBacklog(uint256 planetId) view returns ((bool active, uint8 ship, uint32 quantity, uint64 readyAt, (uint128 metal, uint128 crystal, uint128 deuterium) cost)[])",
@@ -74,8 +73,7 @@ async function readPlayerName(apiUrl, wallet) {
 async function readAnnouncement(client, config, log) {
   const planetId = log.args.planetId;
   const blockNumber = log.blockNumber;
-  const [name, built, planet, activeQueue, backlog] = await Promise.all([
-    client.readContract({ address: config.contractAddress, abi: ABI, functionName: "planetNames", args: [planetId], blockNumber }),
+  const [built, planet, activeQueue, backlog] = await Promise.all([
     client.readContract({ address: config.contractAddress, abi: ABI, functionName: "shipCount", args: [planetId, SOLAR_SATELLITE], blockNumber }),
     client.readContract({ address: config.contractAddress, abi: ABI, functionName: "planet", args: [planetId], blockNumber }),
     client.readContract({ address: config.contractAddress, abi: ABI, functionName: "shipQueue", args: [planetId], blockNumber }),
@@ -84,12 +82,7 @@ async function readAnnouncement(client, config, log) {
   const player = await readPlayerName(config.apiUrl, planet.owner);
 
   return formatAnnouncement({
-    planetId: planetId.toString(),
-    name,
     player,
-    galaxy: Number(planet.galaxy),
-    system: Number(planet.system),
-    position: Number(planet.position),
     total: totalBuiltAndQueued(built, activeQueue, backlog, SOLAR_SATELLITE),
     queued: log.args.quantity.toString()
   });
