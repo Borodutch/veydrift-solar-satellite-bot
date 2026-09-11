@@ -8,7 +8,7 @@ export function totalBuiltAndQueued(built, activeQueue, backlog, ship) {
   BigInt(built)).toString();
 }
 
-export function formatAnnouncement({ player, total, queued }) {
+export function formatAnnouncement({ player, coordinates, total, queued }) {
   const satellite = queued === "1" ? "satellite" : "satellites";
-  return `🛰 ${player} is building ${queued} more solar ${satellite} (already built/queued: ${total})`;
+  return `🛰 ${player} is building ${queued} more solar ${satellite} on [${coordinates}] (already built/queued: ${total})`;
 }

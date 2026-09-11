@@ -82,6 +82,7 @@ async function readAnnouncement(client, config, log) {
   const player = await readPlayerName(config.apiUrl, planet.owner);
 
   return formatAnnouncement({
+    coordinates: `${planet.galaxy}:${planet.system}:${planet.position}`,
     player,
     total: totalBuiltAndQueued(built, activeQueue, backlog, SOLAR_SATELLITE),
     queued: log.args.quantity.toString()

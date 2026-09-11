@@ -4,15 +4,16 @@ import { formatAnnouncement, playerLabel, totalBuiltAndQueued } from "../src/mes
 
 test("formats a solar satellite queue announcement", () => {
   assert.equal(formatAnnouncement({
+    coordinates: "6:9:1",
     player: "borodutch",
     total: "22",
     queued: "5"
-  }), "🛰 borodutch is building 5 more solar satellites (already built/queued: 22)");
+  }), "🛰 borodutch is building 5 more solar satellites on [6:9:1] (already built/queued: 22)");
 });
 
 test("uses singular satellite for a queue of one", () => {
-  assert.equal(formatAnnouncement({ player: "borodutch", total: "1", queued: "1" }),
-    "🛰 borodutch is building 1 more solar satellite (already built/queued: 1)");
+  assert.equal(formatAnnouncement({ player: "borodutch", coordinates: "1:2:3", total: "1", queued: "1" }),
+    "🛰 borodutch is building 1 more solar satellite on [1:2:3] (already built/queued: 1)");
 });
 
 test("adds built satellites to active and backlog solar-satellite queues", () => {
