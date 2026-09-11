@@ -4,34 +4,15 @@ import { formatAnnouncement, playerLabel, totalBuiltAndQueued } from "../src/mes
 
 test("formats a solar satellite queue announcement", () => {
   assert.equal(formatAnnouncement({
-    planetId: "42",
-    name: "New Zion",
     player: "borodutch",
-    galaxy: 6,
-    system: 9,
-    position: 1,
     total: "22",
     queued: "5"
-  }), [
-    "🛰 Solar satellites queued",
-    "",
-    "Player: borodutch",
-    "Planet: New Zion [6:9:1] (#42)",
-    "Already built + already queued: 22",
-    "Added to queue: +5"
-  ].join("\n"));
+  }), "🛰 borodutch is building 5 more solar satellites (already built/queued: 22)");
 });
 
-test("falls back to the planet id when the planet is unnamed", () => {
-  const message = formatAnnouncement({
-    planetId: "7",
-    name: "",
-    player: "0x1234...abcd",
-    total: "1",
-    queued: "1"
-  });
-
-  assert.match(message, /Planet: Planet #7 \(#7\)/);
+test("uses singular satellite for a queue of one", () => {
+  assert.equal(formatAnnouncement({ player: "borodutch", total: "1", queued: "1" }),
+    "🛰 borodutch is building 1 more solar satellite (already built/queued: 1)");
 });
 
 test("adds built satellites to active and backlog solar-satellite queues", () => {
