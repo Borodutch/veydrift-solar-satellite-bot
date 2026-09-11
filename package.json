@@ -1,0 +1,19 @@
+{
+  "name": "veydrift-solar-satellite-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Telegram announcements for Veydrift solar satellite production queues",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "check": "node --check src/index.js && node --check src/message.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "grammy": "^1.46.0",
+    "viem": "^2.56.3"
+  }
+}
