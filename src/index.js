@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 import { Bot } from "grammy";
 import { createPublicClient, http, isAddress, parseAbi } from "viem";
 import { base } from "viem/chains";
-import { formatAnnouncement } from "./message.js";
+import { formatAnnouncement, playerLabel, totalBuiltAndQueued } from "./message.js";
 
 const DEFAULT_CONTRACT = "0xf397910F005151b09644228573a4353818D3755d";
 const SOLAR_SATELLITE = 9;
@@ -11,6 +11,8 @@ const ABI = parseAbi([
   "event ShipQueued(uint256 indexed planetId, uint8 indexed ship, uint32 quantity, uint64 readyAt, uint128 metal, uint128 crystal, uint128 deuterium)",
   "function planetNames(uint256 planetId) view returns (string)",
   "function shipCount(uint256 planetId, uint8 ship) view returns (uint32)",
+  "function shipQueue(uint256 planetId) view returns ((bool active, uint8 ship, uint32 quantity, uint64 readyAt, (uint128 metal, uint128 crystal, uint128 deuterium) cost))",
+  "function shipQueueBacklog(uint256 planetId) view returns ((bool active, uint8 ship, uint32 quantity, uint64 readyAt, (uint128 metal, uint128 crystal, uint128 deuterium) cost)[])",
   "function planet(uint256 planetId) view returns ((address owner, uint16 galaxy, uint16 system, uint8 position, uint16 fields, int16 temperature, uint16 metalMultiplierBps, uint16 crystalMultiplierBps, uint16 deuteriumMultiplierBps, uint64 lastSettledAt, (uint128 metal, uint128 crystal, uint128 deuterium) resources))"
 ]);
 
@@ -30,6 +32,7 @@ function loadConfig() {
     token: process.env.TELEGRAM_BOT_TOKEN,
     chatId: process.env.TELEGRAM_CHAT_ID,
     rpcUrl: process.env.RPC_URL || "https://mainnet.base.org",
+    apiUrl: process.env.VEYDRIFT_API_URL || "https://api.veydrift.com",
     contractAddress,
     confirmations: positiveInteger(process.env.CONFIRMATIONS, 2, "CONFIRMATIONS"),
     pollIntervalMs: positiveInteger(process.env.POLL_INTERVAL_MS, 4000, "POLL_INTERVAL_MS"),
@@ -55,24 +58,40 @@ async function saveState(path, state) {
   await rename(temporary, path);
 }
 
-async function readAnnouncement(client, contractAddress, log) {
+async function readPlayerName(apiUrl, wallet) {
+  try {
+    const response = await fetch(`${apiUrl.replace(/\/+$/, "")}/wallet/${wallet}/profile`, {
+      signal: AbortSignal.timeout(5000)
+    });
+    if (!response.ok) throw new Error(`Player profile returned HTTP ${response.status}`);
+    return playerLabel(await response.json(), wallet);
+  } catch (error) {
+    console.warn("Player profile lookup failed; using wallet fallback", error);
+    return playerLabel(null, wallet);
+  }
+}
+
+async function readAnnouncement(client, config, log) {
   const planetId = log.args.planetId;
   const blockNumber = log.blockNumber;
-  const [name, built, planet] = await Promise.all([
-    client.readContract({ address: contractAddress, abi: ABI, functionName: "planetNames", args: [planetId], blockNumber }),
-    client.readContract({ address: contractAddress, abi: ABI, functionName: "shipCount", args: [planetId, SOLAR_SATELLITE], blockNumber }),
-    client.readContract({ address: contractAddress, abi: ABI, functionName: "planet", args: [planetId], blockNumber })
+  const [name, built, planet, activeQueue, backlog] = await Promise.all([
+    client.readContract({ address: config.contractAddress, abi: ABI, functionName: "planetNames", args: [planetId], blockNumber }),
+    client.readContract({ address: config.contractAddress, abi: ABI, functionName: "shipCount", args: [planetId, SOLAR_SATELLITE], blockNumber }),
+    client.readContract({ address: config.contractAddress, abi: ABI, functionName: "planet", args: [planetId], blockNumber }),
+    client.readContract({ address: config.contractAddress, abi: ABI, functionName: "shipQueue", args: [planetId], blockNumber }),
+    client.readContract({ address: config.contractAddress, abi: ABI, functionName: "shipQueueBacklog", args: [planetId], blockNumber })
   ]);
+  const player = await readPlayerName(config.apiUrl, planet.owner);
 
   return formatAnnouncement({
     planetId: planetId.toString(),
     name,
+    player,
     galaxy: Number(planet.galaxy),
     system: Number(planet.system),
     position: Number(planet.position),
-    built: built.toString(),
-    queued: log.args.quantity.toString(),
-    transactionHash: log.transactionHash
+    total: totalBuiltAndQueued(built, activeQueue, backlog, SOLAR_SATELLITE),
+    queued: log.args.quantity.toString()
   });
 }
 
@@ -113,7 +132,7 @@ async function main() {
         for (const log of logs) {
           const eventId = `${log.transactionHash}:${log.logIndex}`;
           if (state.sent.has(eventId)) continue;
-          const message = await readAnnouncement(client, config.contractAddress, log);
+          const message = await readAnnouncement(client, config, log);
           await bot.api.sendMessage(config.chatId, message, { link_preview_options: { is_disabled: true } });
           state.sent.add(eventId);
           await saveState(config.stateFile, state);
