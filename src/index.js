@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 import { Bot } from "grammy";
 import { createPublicClient, http, isAddress, parseAbi } from "viem";
 import { base } from "viem/chains";
-import { formatAnnouncement, playerLabel, totalBuiltAndQueued } from "./message.js";
+import { formatAnnouncement, playerLabel, shouldAlert, totalBuiltAndQueued } from "./message.js";
 
 const DEFAULT_CONTRACT = "0xf397910F005151b09644228573a4353818D3755d";
 const SOLAR_SATELLITE = 9;
@@ -79,13 +79,17 @@ async function readAnnouncement(client, config, log) {
     client.readContract({ address: config.contractAddress, abi: ABI, functionName: "shipQueue", args: [planetId], blockNumber }),
     client.readContract({ address: config.contractAddress, abi: ABI, functionName: "shipQueueBacklog", args: [planetId], blockNumber })
   ]);
+  const total = totalBuiltAndQueued(built, activeQueue, backlog, SOLAR_SATELLITE);
+  const queued = log.args.quantity.toString();
+  if (!shouldAlert(total, queued)) return null;
+
   const player = await readPlayerName(config.apiUrl, planet.owner);
 
   return formatAnnouncement({
     coordinates: `${planet.galaxy}:${planet.system}:${planet.position}`,
     player,
-    total: totalBuiltAndQueued(built, activeQueue, backlog, SOLAR_SATELLITE),
-    queued: log.args.quantity.toString()
+    total,
+    queued
   });
 }
 
@@ -127,7 +131,9 @@ async function main() {
           const eventId = `${log.transactionHash}:${log.logIndex}`;
           if (state.sent.has(eventId)) continue;
           const message = await readAnnouncement(client, config, log);
-          await bot.api.sendMessage(config.chatId, message, { link_preview_options: { is_disabled: true } });
+          if (message) {
+            await bot.api.sendMessage(config.chatId, message, { link_preview_options: { is_disabled: true } });
+          }
           state.sent.add(eventId);
           await saveState(config.stateFile, state);
         }
