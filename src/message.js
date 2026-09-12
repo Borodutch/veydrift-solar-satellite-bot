@@ -12,3 +12,7 @@ export function formatAnnouncement({ player, coordinates, total, queued }) {
   const satellite = queued === "1" ? "satellite" : "satellites";
   return `🛰 ${player} is building ${queued} more solar ${satellite} on [${coordinates}] (already built/queued: ${total})`;
 }
+
+export function shouldAlert(total, queued) {
+  return BigInt(total) >= 300n || BigInt(queued) >= 50n;
+}

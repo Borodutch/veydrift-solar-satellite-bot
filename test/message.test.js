@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { formatAnnouncement, playerLabel, totalBuiltAndQueued } from "../src/message.js";
+import { formatAnnouncement, playerLabel, shouldAlert, totalBuiltAndQueued } from "../src/message.js";
 
 test("formats a solar satellite queue announcement", () => {
   assert.equal(formatAnnouncement({
@@ -31,4 +31,10 @@ test("adds built satellites to active and backlog solar-satellite queues", () =>
 test("uses the display name with a wallet fallback", () => {
   assert.equal(playerLabel({ displayName: " borodutch ", fallbackName: "fallback" }, "0x1234567890"), "borodutch");
   assert.equal(playerLabel(null, "0x1234567890abcdef"), "0x1234...cdef");
+});
+
+test("alerts only for 300 existing satellites or a queue of 50", () => {
+  assert.equal(shouldAlert("300", "1"), true);
+  assert.equal(shouldAlert("299", "50"), true);
+  assert.equal(shouldAlert("299", "49"), false);
 });
