@@ -1,9 +1,10 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { pathToFileURL } from "node:url";
 import { Bot } from "grammy";
 import { createPublicClient, http, isAddress, parseAbi } from "viem";
 import { base } from "viem/chains";
-import { formatAnnouncement, playerLabel, shouldAlert, totalBuiltAndQueued } from "./message.js";
+import { formatAnnouncement, playerLabel, projectedSatelliteEnergy, shouldAlert, totalBuiltAndQueued } from "./message.js";
 
 const DEFAULT_CONTRACT = "0xf397910F005151b09644228573a4353818D3755d";
 const SOLAR_SATELLITE = 9;
@@ -70,7 +71,7 @@ async function readPlayerName(apiUrl, wallet) {
   }
 }
 
-async function readAnnouncement(client, config, log) {
+export async function readAnnouncement(client, config, log) {
   const planetId = log.args.planetId;
   const blockNumber = log.blockNumber;
   const [built, planet, activeQueue, backlog] = await Promise.all([
@@ -81,7 +82,8 @@ async function readAnnouncement(client, config, log) {
   ]);
   const total = totalBuiltAndQueued(built, activeQueue, backlog, SOLAR_SATELLITE);
   const queued = log.args.quantity.toString();
-  if (!shouldAlert(total, queued)) return null;
+  const projectedEnergy = projectedSatelliteEnergy(total, planet.temperature);
+  if (!shouldAlert(projectedEnergy)) return null;
 
   const player = await readPlayerName(config.apiUrl, planet.owner);
 
@@ -89,7 +91,8 @@ async function readAnnouncement(client, config, log) {
     coordinates: `${planet.galaxy}:${planet.system}:${planet.position}`,
     player,
     total,
-    queued
+    queued,
+    projectedEnergy
   });
 }
 
@@ -150,7 +153,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
