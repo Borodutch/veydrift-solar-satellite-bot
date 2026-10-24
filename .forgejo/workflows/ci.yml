@@ -3,17 +3,24 @@ on:
   push:
     branches: [main]
   pull_request:
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # Our own runs use the Mac runners (brew Node); outsiders' PRs (AGit via the github bot) stay on Linux
+    runs-on: ${{ (github.event_name != 'pull_request' || contains(fromJSON('["backmeupplz","renovate","claude"]'), github.event.pull_request.user.login)) && 'macos-latest' || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - if: runner.os == 'Linux'
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npm run check
-      - run: npm test
+      - run: npm ci --no-audit --no-fund
+      - run: |
+          npm run check &
+          npm test &
+          for job in $(jobs -p); do wait $job || exit 1; done
