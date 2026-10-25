@@ -1,4 +1,0 @@
-[phases.setup]
-nixpkgsArchive = "da6dc0e7b26060f2f71ce3ef7088fb56ee44fa36"
-nixPkgs = ["nodejs_22", "yarn-1_x"]
-
