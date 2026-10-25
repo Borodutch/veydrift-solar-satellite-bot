@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
 COPY src ./src
-RUN mkdir .state && chown node:node .state
+RUN mkdir .state /handover && chown node:node .state /handover
 
 USER node
-CMD ["npm", "start"]
+CMD ["node", "src/index.js"]

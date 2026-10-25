@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
-    "check": "node --check src/index.js && node --check src/message.js",
+    "check": "node --check src/index.js && node --check src/message.js && node --check src/handover.js",
     "test": "node --test"
   },
   "engines": {

@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import { Bot } from "grammy";
 import { createPublicClient, http, isAddress, parseAbi } from "viem";
 import { base } from "viem/chains";
+import { pollWithHandover } from "./handover.js";
 import { formatAnnouncement, playerLabel, projectedSatelliteEnergy, shouldAlert, totalBuiltAndQueued } from "./message.js";
 
 const DEFAULT_CONTRACT = "0xf397910F005151b09644228573a4353818D3755d";
@@ -96,60 +97,68 @@ export async function readAnnouncement(client, config, log) {
   });
 }
 
-const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
-
 async function main() {
   const config = loadConfig();
   const client = createPublicClient({ chain: base, transport: http(config.rpcUrl) });
   const bot = new Bot(config.token);
-  const latestBlock = await client.getBlockNumber();
-  const state = await loadState(config.stateFile, latestBlock);
   let stopping = false;
+  let wake = () => {};
+  let watching;
+  // One watcher at a time: the next container loads the cursor only after this one saved it and let go
+  await pollWithHandover(
+    () => (watching = watch()),
+    async () => {
+      stopping = true;
+      wake();
+      await watching;
+    }
+  );
 
-  for (const signal of ["SIGINT", "SIGTERM"]) {
-    process.once(signal, () => { stopping = true; });
-  }
+  async function watch() {
+    const latestBlock = await client.getBlockNumber();
+    const state = await loadState(config.stateFile, latestBlock);
 
-  console.log(`Watching Veydrift from block ${state.nextBlock} on Base mainnet`);
+    console.log(`Watching Veydrift from block ${state.nextBlock} on Base mainnet`);
 
-  while (!stopping) {
-    try {
-      const head = await client.getBlockNumber();
-      const confirmedHead = head > BigInt(config.confirmations) ? head - BigInt(config.confirmations) : 0n;
+    while (!stopping) {
+      try {
+        const head = await client.getBlockNumber();
+        const confirmedHead = head > BigInt(config.confirmations) ? head - BigInt(config.confirmations) : 0n;
 
-      if (state.nextBlock <= confirmedHead) {
-        const toBlock = state.nextBlock + BigInt(config.blockBatchSize - 1) < confirmedHead
-          ? state.nextBlock + BigInt(config.blockBatchSize - 1)
-          : confirmedHead;
-        const logs = await client.getContractEvents({
-          address: config.contractAddress,
-          abi: ABI,
-          eventName: "ShipQueued",
-          args: { ship: SOLAR_SATELLITE },
-          fromBlock: state.nextBlock,
-          toBlock
-        });
+        if (state.nextBlock <= confirmedHead) {
+          const toBlock = state.nextBlock + BigInt(config.blockBatchSize - 1) < confirmedHead
+            ? state.nextBlock + BigInt(config.blockBatchSize - 1)
+            : confirmedHead;
+          const logs = await client.getContractEvents({
+            address: config.contractAddress,
+            abi: ABI,
+            eventName: "ShipQueued",
+            args: { ship: SOLAR_SATELLITE },
+            fromBlock: state.nextBlock,
+            toBlock
+          });
 
-        for (const log of logs) {
-          const eventId = `${log.transactionHash}:${log.logIndex}`;
-          if (state.sent.has(eventId)) continue;
-          const message = await readAnnouncement(client, config, log);
-          if (message) {
-            await bot.api.sendMessage(config.chatId, message, { link_preview_options: { is_disabled: true } });
+          for (const log of logs) {
+            const eventId = `${log.transactionHash}:${log.logIndex}`;
+            if (state.sent.has(eventId)) continue;
+            const message = await readAnnouncement(client, config, log);
+            if (message) {
+              await bot.api.sendMessage(config.chatId, message, { link_preview_options: { is_disabled: true } });
+            }
+            state.sent.add(eventId);
+            await saveState(config.stateFile, state);
           }
-          state.sent.add(eventId);
+
+          state.nextBlock = toBlock + 1n;
+          state.sent.clear();
           await saveState(config.stateFile, state);
         }
-
-        state.nextBlock = toBlock + 1n;
-        state.sent.clear();
-        await saveState(config.stateFile, state);
+      } catch (error) {
+        console.error("Polling failed; retrying without advancing the cursor", error);
       }
-    } catch (error) {
-      console.error("Polling failed; retrying without advancing the cursor", error);
-    }
 
-    if (!stopping) await wait(config.pollIntervalMs);
+      if (!stopping) await new Promise((resolve) => { wake = resolve; setTimeout(resolve, config.pollIntervalMs); });
+    }
   }
 }
 
