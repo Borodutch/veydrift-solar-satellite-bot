@@ -55,4 +55,4 @@ npm test
 
 ## "ca"
 
-The bot also replies to a message that is just `ca` (or `CA`, `ca?`, `/ca`) with the VEYDRIFT address in `<code>` (monospace, tap to copy). It polls Telegram for messages under the same handover lock, so only one container polls at a time. In groups the bot only sees plain `ca` if it's an admin or its privacy mode is off (BotFather `/setprivacy` → Disable); `/ca` works either way.
+The bot also replies to a message that is just `ca` (or `CA`, `ca?`, `/ca`) with the VEYDRIFT address in `<code>` (monospace, tap to copy), and to `twitter` with x.com/veydrift. The answers live in `ANSWERS` in `src/ca.js`. It polls Telegram for messages under the same handover lock, so only one container polls at a time. In groups the bot only sees plain `ca` if it's an admin or its privacy mode is off (BotFather `/setprivacy` → Disable); `/ca` works either way.
