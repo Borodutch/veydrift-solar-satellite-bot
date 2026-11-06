@@ -7,6 +7,7 @@ import { base } from "viem/chains";
 import { pollWithHandover } from "./handover.js";
 import { formatAnnouncement, playerLabel, projectedSatelliteEnergy, shouldAlert, totalBuiltAndQueued } from "./message.js";
 import { BUY_ABI, DEFAULT_BUY_CHAT, DEFAULT_POOL_ID, POOL_MANAGER, readBuy } from "./buys.js";
+import { answerCa } from "./ca.js";
 
 const DEFAULT_CONTRACT = "0xf397910F005151b09644228573a4353818D3755d";
 const SOLAR_SATELLITE = 9;
@@ -129,13 +130,20 @@ async function main() {
       send(config.buyChatId, { parse_mode: "HTML" })));
   }
 
-  // One watcher at a time: the next container loads the cursors only after this one saved them and let go
+  answerCa(bot);
+
+  // One instance at a time: the next container loads the cursors only after this one saved them and
+  // let go, and only one getUpdates poller runs (Telegram answers a second one with 409)
   await pollWithHandover(
-    () => (watching = Promise.all(watchers.map((start) => start()))),
+    () => {
+      bot.start({ allowed_updates: ["message"], onStart: () => console.log("Answering ca in chats") })
+        .catch((error) => console.error("Telegram polling stopped", error));
+      return (watching = Promise.all(watchers.map((start) => start())));
+    },
     async () => {
       stopping = true;
       wake();
-      await watching;
+      await Promise.all([watching, bot.stop()]);
     }
   );
 
