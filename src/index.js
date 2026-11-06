@@ -6,6 +6,7 @@ import { createPublicClient, http, isAddress, parseAbi } from "viem";
 import { base } from "viem/chains";
 import { pollWithHandover } from "./handover.js";
 import { formatAnnouncement, playerLabel, projectedSatelliteEnergy, shouldAlert, totalBuiltAndQueued } from "./message.js";
+import { BUY_ABI, DEFAULT_BUY_CHAT, DEFAULT_POOL_ID, POOL_MANAGER, readBuy } from "./buys.js";
 
 const DEFAULT_CONTRACT = "0xf397910F005151b09644228573a4353818D3755d";
 const SOLAR_SATELLITE = 9;
@@ -38,7 +39,12 @@ function loadConfig() {
     confirmations: positiveInteger(process.env.CONFIRMATIONS, 2, "CONFIRMATIONS"),
     pollIntervalMs: positiveInteger(process.env.POLL_INTERVAL_MS, 4000, "POLL_INTERVAL_MS"),
     blockBatchSize: positiveInteger(process.env.BLOCK_BATCH_SIZE, 2000, "BLOCK_BATCH_SIZE"),
-    stateFile: process.env.STATE_FILE || ".state/cursor.json"
+    stateFile: process.env.STATE_FILE || ".state/cursor.json",
+    // Buys of the ETH/VEYDRIFT pool; BUY_CHAT_ID="" turns them off
+    buyChatId: process.env.BUY_CHAT_ID ?? DEFAULT_BUY_CHAT,
+    buyPoolId: process.env.BUY_POOL_ID || DEFAULT_POOL_ID,
+    buyMinUsd: Number(process.env.BUY_MIN_USD || 0),
+    buyStateFile: process.env.BUY_STATE_FILE || ".state/buys.json"
   };
 }
 
@@ -102,11 +108,30 @@ async function main() {
   const client = createPublicClient({ chain: base, transport: http(config.rpcUrl) });
   const bot = new Bot(config.token);
   let stopping = false;
-  let wake = () => {};
+  let wake;
+  const stopped = new Promise((resolve) => { wake = resolve; });
   let watching;
-  // One watcher at a time: the next container loads the cursor only after this one saved it and let go
+  const send = (chatId, options) => (message) =>
+    bot.api.sendMessage(chatId, message, { link_preview_options: { is_disabled: true }, ...options });
+
+  const watchers = [() => follow("Solar Satellite queues", config.stateFile,
+    (fromBlock, toBlock) => client.getContractEvents({
+      address: config.contractAddress, abi: ABI, eventName: "ShipQueued", args: { ship: SOLAR_SATELLITE }, fromBlock, toBlock
+    }),
+    (log) => readAnnouncement(client, config, log),
+    send(config.chatId))];
+  if (config.buyChatId) {
+    watchers.push(() => follow("ETH/VEYDRIFT buys", config.buyStateFile,
+      (fromBlock, toBlock) => client.getContractEvents({
+        address: POOL_MANAGER, abi: BUY_ABI, eventName: "Swap", args: { id: config.buyPoolId }, fromBlock, toBlock
+      }),
+      (log) => readBuy(client, config, log),
+      send(config.buyChatId, { parse_mode: "HTML" })));
+  }
+
+  // One watcher at a time: the next container loads the cursors only after this one saved them and let go
   await pollWithHandover(
-    () => (watching = watch()),
+    () => (watching = Promise.all(watchers.map((start) => start()))),
     async () => {
       stopping = true;
       wake();
@@ -114,11 +139,12 @@ async function main() {
     }
   );
 
-  async function watch() {
+  // Polls confirmed blocks from a saved cursor; posts what `announce` returns, at most once per log.
+  async function follow(name, stateFile, fetchLogs, announce, post) {
     const latestBlock = await client.getBlockNumber();
-    const state = await loadState(config.stateFile, latestBlock);
+    const state = await loadState(stateFile, latestBlock);
 
-    console.log(`Watching Veydrift from block ${state.nextBlock} on Base mainnet`);
+    console.log(`Watching ${name} from block ${state.nextBlock} on Base mainnet`);
 
     while (!stopping) {
       try {
@@ -129,35 +155,26 @@ async function main() {
           const toBlock = state.nextBlock + BigInt(config.blockBatchSize - 1) < confirmedHead
             ? state.nextBlock + BigInt(config.blockBatchSize - 1)
             : confirmedHead;
-          const logs = await client.getContractEvents({
-            address: config.contractAddress,
-            abi: ABI,
-            eventName: "ShipQueued",
-            args: { ship: SOLAR_SATELLITE },
-            fromBlock: state.nextBlock,
-            toBlock
-          });
+          const logs = await fetchLogs(state.nextBlock, toBlock);
 
           for (const log of logs) {
             const eventId = `${log.transactionHash}:${log.logIndex}`;
             if (state.sent.has(eventId)) continue;
-            const message = await readAnnouncement(client, config, log);
-            if (message) {
-              await bot.api.sendMessage(config.chatId, message, { link_preview_options: { is_disabled: true } });
-            }
+            const message = await announce(log);
+            if (message) await post(message);
             state.sent.add(eventId);
-            await saveState(config.stateFile, state);
+            await saveState(stateFile, state);
           }
 
           state.nextBlock = toBlock + 1n;
           state.sent.clear();
-          await saveState(config.stateFile, state);
+          await saveState(stateFile, state);
         }
       } catch (error) {
-        console.error("Polling failed; retrying without advancing the cursor", error);
+        console.error(`${name}: polling failed; retrying without advancing the cursor`, error);
       }
 
-      if (!stopping) await new Promise((resolve) => { wake = resolve; setTimeout(resolve, config.pollIntervalMs); });
+      if (!stopping) await Promise.race([stopped, new Promise((resolve) => setTimeout(resolve, config.pollIntervalMs))]);
     }
   }
 }

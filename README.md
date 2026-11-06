@@ -30,6 +30,12 @@ The process polls confirmed Base blocks for Veydrift's indexed `ShipQueued` even
 
 Projected energy uses the event-block built + active-queue + backlog satellite count, including the new queue exactly once, multiplied by that planet’s per-satellite energy. Inactive and non-satellite queues are excluded. Per-satellite energy is `(temperature + 140) / 6`, integer-truncated then clamped to 1–65; there is no count-only bypass. `planet.temperature` is passed directly as the maximum temperature by the canonical contract (no offset): verified against [VeydriftGame.energyBalance](https://github.com/Borodutch/veydrift/blob/eda10dbae26d34834037cd2e258877b069e32a5c/packages/contracts/src/VeydriftGame.sol#L774-L789) and [VeydriftFormulas.solarSatelliteEnergy](https://github.com/Borodutch/veydrift/blob/eda10dbae26d34834037cd2e258877b069e32a5c/packages/contracts/src/libraries/VeydriftFormulas.sol#L143-L148). Suppressed events still advance the existing cursor/deduplication flow.
 
+## Buys
+
+The same process also posts every buy of the Uniswap v4 ETH/VEYDRIFT pool (`0xa48cdc0e…c45c51`) to `BUY_CHAT_ID` (default `@veydriftdotcom`; the bot must be a member allowed to post). It polls the PoolManager's `Swap` events for that pool id. A buy is a swap where the swapper pays ETH (`amount0 < 0`) and receives VEYDRIFT (`amount1 > 0`). Each message shows the ETH spent with its USD value (Chainlink ETH/USD at the swap's block), the VEYDRIFT received, the post-swap price and FDV (1B supply), and links to the buyer, the transaction and the DexScreener chart. `BUY_MIN_USD` skips smaller buys and `BUY_CHAT_ID=""` turns buys off. The buy cursor lives in `.state/buys.json`.
+
+## State
+
 The first run starts at the current chain head, so deploying the bot does not replay historical queues. The next block cursor is stored atomically in `.state/cursor.json`; mount `.state` on persistent storage in production.
 
 Defaults:
