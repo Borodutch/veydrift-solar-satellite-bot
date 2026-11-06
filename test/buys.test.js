@@ -19,10 +19,10 @@ test("prices VEYDRIFT from the post-swap sqrt price", () => {
 
 test("formats a buy for Telegram HTML", () => {
   assert.equal(formatBuy({ ...buyAmounts(BUY), ethUsd: 2232.13647666, priceUsd: veydriftUsd(BUY.sqrtPriceX96, 2232.13647666), buyer: BUYER, txHash: "0x9cb8", chartUrl: "https://dexscreener.com/base/0xa48c" }), [
-    "🟢".repeat(14),
-    "<b>$VEYDRIFT buy</b>: 0.297 ETH ($663) → 4,026,743 $VEYDRIFT",
-    "Price $0.000185 · FDV $184.8K",
-    `<a href="https://basescan.org/address/${BUYER}">0xb9b7…4b5c</a> · <a href="https://basescan.org/tx/0x9cb8">tx</a> · <a href="https://dexscreener.com/base/0xa48c">chart</a>`
+    "🚀".repeat(14),
+    "🛸 <b>$VEYDRIFT buy</b>: 0.297 ETH ($663) → 4,026,743 $VEYDRIFT",
+    "🪐 Price $0.000185 · 🌌 FDV $184.8K",
+    `👨‍🚀 <a href="https://basescan.org/address/${BUYER}">0xb9b7…4b5c</a> · 🛰 <a href="https://basescan.org/tx/0x9cb8">tx</a> · 📡 <a href="https://dexscreener.com/base/0xa48c">chart</a>`
   ].join("\n"));
 });
 

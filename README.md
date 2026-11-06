@@ -32,7 +32,7 @@ Projected energy uses the event-block built + active-queue + backlog satellite c
 
 ## Buys
 
-The same process also posts every buy of the Uniswap v4 ETH/VEYDRIFT pool (`0xa48cdc0e…c45c51`) to `BUY_CHAT_ID` (default `@veydriftdotcom`; the bot must be a member allowed to post). It polls the PoolManager's `Swap` events for that pool id. A buy is a swap where the swapper pays ETH (`amount0 < 0`) and receives VEYDRIFT (`amount1 > 0`). Each message shows the ETH spent with its USD value (Chainlink ETH/USD at the swap's block), the VEYDRIFT received, the post-swap price and FDV (1B supply), and links to the buyer, the transaction and the DexScreener chart. `BUY_MIN_USD` skips smaller buys and `BUY_CHAT_ID=""` turns buys off. The buy cursor lives in `.state/buys.json`.
+The same process also posts every buy of the Uniswap v4 ETH/VEYDRIFT pool (`0xa48cdc0e…c45c51`) to `BUY_CHAT_ID` (default `@veydriftdotcom`; the bot must be a member allowed to post). It polls the PoolManager's `Swap` events for that pool id. A buy is a swap where the swapper pays ETH (`amount0 < 0`) and receives VEYDRIFT (`amount1 > 0`). Each message has a 🚀 bar (one per $50, up to 20) and shows the ETH spent with its USD value (Chainlink ETH/USD at the swap's block), the VEYDRIFT received, the post-swap price and FDV (1B supply), and links to the buyer, the transaction and the DexScreener chart. `BUY_MIN_USD` skips smaller buys and `BUY_CHAT_ID=""` turns buys off. The buy cursor lives in `.state/buys.json`.
 
 ## State
 

@@ -28,12 +28,13 @@ const short = (address) => `${address.slice(0, 6)}…${address.slice(-4)}`;
 
 export function formatBuy({ eth, veydrift, ethUsd, priceUsd, buyer, txHash, chartUrl }) {
   const ethAmount = Number(eth) / 1e18, spentUsd = ethAmount * ethUsd;
-  const dots = "🟢".repeat(Math.min(20, Math.max(1, Math.ceil(spentUsd / 50))));
+  // One rocket per $50, 1 to 20
+  const rockets = "🚀".repeat(Math.min(20, Math.max(1, Math.ceil(spentUsd / 50))));
   return [
-    `${dots}`,
-    `<b>$VEYDRIFT buy</b>: ${significant(ethAmount, 4)} ETH (${usd(spentUsd)}) → ${Math.round(Number(veydrift) / 1e18).toLocaleString("en-US")} $VEYDRIFT`,
-    `Price ${usd(priceUsd)} · FDV $${(priceUsd * SUPPLY).toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 1 })}`,
-    `<a href="https://basescan.org/address/${buyer}">${short(buyer)}</a> · <a href="https://basescan.org/tx/${txHash}">tx</a> · <a href="${chartUrl}">chart</a>`
+    rockets,
+    `🛸 <b>$VEYDRIFT buy</b>: ${significant(ethAmount, 4)} ETH (${usd(spentUsd)}) → ${Math.round(Number(veydrift) / 1e18).toLocaleString("en-US")} $VEYDRIFT`,
+    `🪐 Price ${usd(priceUsd)} · 🌌 FDV $${(priceUsd * SUPPLY).toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 1 })}`,
+    `👨‍🚀 <a href="https://basescan.org/address/${buyer}">${short(buyer)}</a> · 🛰 <a href="https://basescan.org/tx/${txHash}">tx</a> · 📡 <a href="${chartUrl}">chart</a>`
   ].join("\n");
 }
 
